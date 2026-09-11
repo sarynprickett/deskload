@@ -36,3 +36,14 @@ coverage/
 .idea/
 .vscode/
 *.swp
+
+/src/generated/prisma
+
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
+
+# Agent skill packs installed by `prisma init` (restored from skills-lock.json).
+# .claude/skills and .windsurf/skills are symlinks into .agents/skills.
+/.agents/
+/.windsurf/
+/.claude/skills

@@ -1,0 +1,70 @@
+@import "tailwindcss";
+
+:root {
+  --background: #fbfaf7;
+  --surface: #ffffff;
+  --surface-muted: #f4f2ed;
+  --foreground: #16150f;
+  --muted: #6b6759;
+  --border: #e2ded3;
+  --accent: #8a3324;
+  --accent-soft: #f7ece8;
+  --over: #b03a2e;
+  --over-soft: #fbeae7;
+  --under: #1f6f5c;
+  --under-soft: #e6f2ee;
+  --pending: #8a6d1f;
+  --pending-soft: #fbf3dd;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #12110e;
+    --surface: #1a1915;
+    --surface-muted: #22201b;
+    --foreground: #f0ede4;
+    --muted: #a39d8c;
+    --border: #322f27;
+    --accent: #e0836c;
+    --accent-soft: #2c1d18;
+    --over: #e8836f;
+    --over-soft: #2e1b17;
+    --under: #6ec5aa;
+    --under-soft: #14261f;
+    --pending: #d7b45c;
+    --pending-soft: #2a2314;
+  }
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-foreground: var(--foreground);
+  --color-muted: var(--muted);
+  --color-line: var(--border);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-over: var(--over);
+  --color-over-soft: var(--over-soft);
+  --color-under: var(--under);
+  --color-under-soft: var(--under-soft);
+  --color-pending: var(--pending);
+  --color-pending-soft: var(--pending-soft);
+  --font-sans: var(--font-inter);
+  --font-display: var(--font-source-serif);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+.display {
+  font-family: var(--font-source-serif), Georgia, "Times New Roman", serif;
+}
+
+/* Thin rule used under section headers, echoing a printed masthead. */
+.rule {
+  border-bottom: 1px solid var(--border);
+}

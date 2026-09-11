@@ -1,0 +1,178 @@
+// Deskload schema — see PLAN.md §9 for the originating design.
+//
+// Two deliberate divergences from the minimal schema sketched in the plan:
+//   1. Credit lives in TaskCredit, not a single `credited_user_id` on Task, so two
+//      people can split one task (§11 recommends allowing this from day one — it is
+//      a small change now and an annoying migration later).
+//   2. Organization carries the visibility + threshold settings that §6/§7 require
+//      to be configurable per newsroom.
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum Role {
+  ADMIN
+  EDITOR
+  STAFF
+}
+
+enum IssueStatus {
+  OPEN
+  CLOSED
+}
+
+enum TaskStatus {
+  ASSIGNED // an editor handed this off; not done yet
+  COMPLETED // done and credited, but not yet vouched for by an editor
+  CONFIRMED // an editor confirmed it — this is the trustworthy number (§5)
+}
+
+/// §7: masthead-wide visibility is opt-in per newsroom and off by default.
+enum ScoreboardVisibility {
+  PRIVATE
+  MASTHEAD
+}
+
+model Organization {
+  id                   String               @id @default(cuid())
+  name                 String
+  slug                 String               @unique
+  scoreboardVisibility ScoreboardVisibility @default(PRIVATE)
+
+  /// Weighted points per week above which an editor gets a "carrying too much" flag (§6).
+  overloadThreshold Float @default(20)
+  /// Weighted points per week below which someone is flagged as having capacity (§6).
+  underloadThreshold Float @default(4)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  users     User[]
+  issues    Issue[]
+  taskTypes TaskType[]
+}
+
+model User {
+  id     String       @id @default(cuid())
+  orgId  String
+  org    Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name   String
+  email  String       @unique
+  role   Role         @default(STAFF)
+  /// Someone who has left the masthead: keeps their history, drops off active reports.
+  active Boolean      @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  credits        TaskCredit[]
+  tasksLogged    Task[]       @relation("TaskLoggedBy")
+  tasksConfirmed Task[]       @relation("TaskConfirmedBy")
+
+  @@index([orgId])
+}
+
+model Issue {
+  id         String       @id @default(cuid())
+  orgId      String
+  org        Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name       String
+  cycleStart DateTime
+  cycleEnd   DateTime
+  status     IssueStatus  @default(OPEN)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  stories Story[]
+
+  @@index([orgId, cycleStart])
+}
+
+model Story {
+  id      String @id @default(cuid())
+  issueId String
+  issue   Issue  @relation(fields: [issueId], references: [id], onDelete: Cascade)
+  title   String
+  slug    String
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks Task[]
+
+  @@unique([issueId, slug])
+  @@index([issueId])
+}
+
+/// §4: ships with defaults, editable per newsroom.
+model TaskType {
+  id            String       @id @default(cuid())
+  orgId         String
+  org           Organization @relation(fields: [orgId], references: [id], onDelete: Cascade)
+  name          String
+  defaultWeight Float        @default(1)
+  sortOrder     Int          @default(0)
+  /// Retired types stay attached to historical tasks but can't be picked for new ones.
+  archived      Boolean      @default(false)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  tasks Task[]
+
+  @@unique([orgId, name])
+  @@index([orgId])
+}
+
+model Task {
+  id         String     @id @default(cuid())
+  storyId    String
+  story      Story      @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  taskTypeId String
+  taskType   TaskType   @relation(fields: [taskTypeId], references: [id], onDelete: Restrict)
+  /// Snapshot of TaskType.defaultWeight at log time, so re-weighting a type later
+  /// doesn't silently rewrite history.
+  weight     Float
+  status     TaskStatus @default(COMPLETED)
+  note       String?
+
+  loggedById    String?
+  loggedBy      User?     @relation("TaskLoggedBy", fields: [loggedById], references: [id], onDelete: SetNull)
+  confirmedById String?
+  confirmedBy   User?     @relation("TaskConfirmedBy", fields: [confirmedById], references: [id], onDelete: SetNull)
+  confirmedAt   DateTime?
+
+  /// When the work actually happened — this is what the weekly report buckets on.
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  credits TaskCredit[]
+
+  @@index([storyId])
+  @@index([taskTypeId])
+  @@index([completedAt])
+}
+
+/// One row per person credited on a task. `share` splits a task between people
+/// and should sum to 1 across a task's credits.
+model TaskCredit {
+  id     String @id @default(cuid())
+  taskId String
+  task   Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  share  Float  @default(1)
+
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, userId])
+  @@index([userId])
+}
